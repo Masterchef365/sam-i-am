@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
-use common::ServerToClient;
-use egui::{CentralPanel, Color32, RichText};
+use common::{AnnotationData, ClientToServer, FaceKey, ImageData, ServerToClient};
+use egui::{ahash::HashMap, CentralPanel, Color32, Context, RichText, TextureId, TextureOptions};
 use ewebsock::{WsEvent, WsMessage, WsReceiver, WsSender};
 
 // When compiling natively:
@@ -73,14 +73,29 @@ fn main() {
     });
 }
 
-pub struct Session {
+pub struct SocketSession {
     sender: WsSender,
     receiver: WsReceiver,
     is_open: bool,
+
+    data: ClientSession,
+}
+
+#[derive(Default)]
+pub struct ClientSession {
+    /// If the user has chosen a folder, lists the prefixes of the files in that folder
+    folder_contents: Option<Vec<FaceKey>>,
+    annotation_sess: Option<AnnotationSession>,
+}
+
+pub struct AnnotationSession {
+    key: FaceKey,
+    annotations: AnnotationData,
+    image: TextureId,
 }
 
 pub struct TemplateApp {
-    session: Result<Session>,
+    session: Result<SocketSession>,
 }
 
 impl TemplateApp {
@@ -91,7 +106,7 @@ impl TemplateApp {
         }
         */
 
-        let session = Session::new();
+        let session = SocketSession::new();
 
         Self { session }
     }
@@ -110,18 +125,18 @@ impl eframe::App for TemplateApp {
                 CentralPanel::default().show(ctx, |ui| {
                     ui.label(error);
                     if ui.button("Reconnect").clicked() {
-                        self.session = Session::new();
+                        self.session = SocketSession::new();
                     }
                 });
                 return;
             }
         };
 
-        if let Err(e) = session.receive() {
+        if let Err(e) = session.receive(ctx) {
             self.session = Err(e);
             return;
         }
-        
+
         if !session.is_open {
             CentralPanel::default().show(ctx, |ui| {
                 ui.label("Connecting, please wait...");
@@ -129,13 +144,11 @@ impl eframe::App for TemplateApp {
             return;
         }
 
-        CentralPanel::default().show(ctx, |ui| {
-            ui.label("Connected!");
-        });
+        session_gui(ctx, session);
     }
 }
 
-impl Session {
+impl SocketSession {
     pub fn new() -> Result<Self> {
         let options = ewebsock::Options::default();
         let (sender, receiver) =
@@ -144,34 +157,82 @@ impl Session {
             sender,
             receiver,
             is_open: false,
+            data: ClientSession::default(),
         })
     }
 
-    pub fn receive(&mut self) -> Result<()> {
+    pub fn receive(&mut self, ctx: &Context) -> Result<()> {
         if let Some(msg) = self.receiver.try_recv() {
             match msg {
                 WsEvent::Closed => return Err(anyhow!("Remote session was closed!")),
                 WsEvent::Opened => self.is_open = true,
                 WsEvent::Error(e) => return Err(anyhow!("{e}")),
-                WsEvent::Message(msg) => self.handle_ws_msg(msg)?,
+                WsEvent::Message(msg) => self.handle_ws_msg(msg, ctx)?,
             };
         }
 
         Ok(())
     }
 
-    fn handle_ws_msg(&mut self, msg: WsMessage) -> Result<()> {
+    fn handle_ws_msg(&mut self, msg: WsMessage, ctx: &Context) -> Result<()> {
         let WsMessage::Binary(msg) = msg else {
             return Ok(());
         };
 
         let decoded = common::deserialize(&mut std::io::Cursor::new(msg))?;
 
-        self.handle_msg(decoded)
-    }
-
-    fn handle_msg(&mut self, msg: ServerToClient) -> Result<()> {
+        for msg in self.data.handle_msg(decoded, ctx)? {
+            self.send_ws_message(msg)?;
+        }
 
         Ok(())
     }
+
+    fn send_ws_message(&mut self, msg: ClientToServer) -> Result<()> {
+        let mut buf = vec![];
+        common::serialize(&mut buf, &msg)?;
+        self.sender.send(WsMessage::Binary(buf));
+        Ok(())
+    }
+}
+
+fn upload_image(ctx: &Context, image: ImageData) -> TextureId {
+    let image =
+        egui::ColorImage::from_rgb([image.width as usize, image.height as usize], &image.rgb);
+    ctx.tex_manager().write().alloc(
+        "board texture".to_string(),
+        image.into(),
+        TextureOptions::NEAREST,
+    )
+}
+
+impl ClientSession {
+    fn handle_msg(&mut self, msg: ServerToClient, ctx: &Context) -> Result<Vec<ClientToServer>> {
+        let mut responses = vec![];
+
+        match msg {
+            ServerToClient::FolderContents(keys) => self.folder_contents = Some(keys),
+            ServerToClient::InitialLoad(key, image, annotations) => {
+                let image = upload_image(ctx, image);
+                self.annotation_sess = Some(AnnotationSession {
+                    key,
+                    annotations,
+                    image,
+                });
+            }
+            ServerToClient::ServerUpdated(ann) => {
+                if let Some(sess) = &mut self.annotation_sess {
+                    sess.annotations = ann;
+                }
+            }
+        }
+
+        Ok(responses)
+    }
+}
+
+fn session_gui(ctx: &Context, sess: &mut SocketSession) {
+    CentralPanel::default().show(ctx, |ui| {
+        ui.label("Connected!");
+    });
 }

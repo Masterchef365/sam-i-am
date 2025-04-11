@@ -41,10 +41,13 @@ pub struct AnnotationData {
     pub polygons: Vec<Defect>,
 }
 
+/// Refers to a specific face of a board
 #[derive(Deserialize, Serialize)]
-pub enum NarrowOrWide {
-    Narrow,
-    Wide,
+pub struct FaceKey {
+    /// Prefix to the file name, e.g. 20250306_054339_38x184_793738TR
+    pub prefix: String,
+    /// Whether this face is narrow or wide
+    pub is_narrow: bool,
 }
 
 /// Protocol messages sent from client to server
@@ -53,7 +56,7 @@ pub enum ClientToServer {
     /// Set the folder for the current session. Induces
     LoadFolder(PathBuf),
     /// Loads the file with the given prefix, and the given face
-    LoadPath(String, NarrowOrWide),
+    LoadPath(FaceKey),
     /// Annotation events
     Annotate(AnnotationEvent),
 }
@@ -78,9 +81,9 @@ pub enum SamEvent {
 #[derive(Deserialize, Serialize)]
 pub enum ServerToClient {
     /// Returned contents of a folder
-    FolderContents(Vec<String>),
+    FolderContents(Vec<FaceKey>),
     /// Image and annotations loaded from disk
-    InitialLoad(ImageData, AnnotationData),
+    InitialLoad(FaceKey, ImageData, AnnotationData),
     /// An annotation event was fired
     ServerUpdated(AnnotationData),
 }
