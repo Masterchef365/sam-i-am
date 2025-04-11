@@ -20,7 +20,9 @@ eframe = { version = "0.31", default-features = false, features = [
 ] }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
-common ={ path = "../common" }
+common = { path = "../common" }
+ewebsock = "0.8.0"
+anyhow = "1"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
