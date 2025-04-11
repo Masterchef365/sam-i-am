@@ -42,7 +42,7 @@ pub struct AnnotationData {
 }
 
 /// Refers to a specific face of a board
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct FaceKey {
     /// Prefix to the file name, e.g. 20250306_054339_38x184_793738TR
     pub prefix: String,

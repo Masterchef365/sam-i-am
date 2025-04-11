@@ -238,20 +238,52 @@ impl ClientSession {
 
 fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
     if sess.data.folder_contents.is_none() {
-        return CentralPanel::default().show(ctx, |ui| {
-            ui.label("Enter a folder path below:");
-            ui.horizontal(|ui| {
-                ui.text_edit_singleline(&mut sess.data.folder_path);
-                if ui.button("Load").clicked() {
-                    sess.send_ws_message(ClientToServer::LoadFolder(
-                        sess.data.folder_path.clone(),
-                    ))?;
-                }
-                Ok(())
+        return CentralPanel::default()
+            .show(ctx, |ui| {
+                ui.label("Enter a folder path below:");
+                ui.horizontal(|ui| {
+                    ui.text_edit_singleline(&mut sess.data.folder_path);
+                    if ui.button("Load").clicked() {
+                        sess.send_ws_message(ClientToServer::LoadFolder(
+                            sess.data.folder_path.clone(),
+                        ))?;
+                    }
+                    Ok(())
+                })
+                .inner
             })
-            .inner
-        }).inner;
+            .inner;
     }
+
+    let Some(ann) = &mut sess.data.annotation_sess else {
+        return CentralPanel::default().show(ctx, |ui| {
+            if ui.button("Pick a different folder").clicked() {
+                sess.data.folder_contents = None;
+                sess.data.annotation_sess = None;
+            }
+
+            if let Some(folder) = &sess.data.folder_contents {
+                for key in folder {
+                    if ui
+                        .button(format!("{} {}", key.prefix, key.is_narrow))
+                        .clicked()
+                    {
+                        return sess.send_ws_message(ClientToServer::LoadPath(key.clone()));
+                    }
+                }
+            }
+
+            Ok(())
+        }).inner;
+    };
+
+    CentralPanel::default().show(ctx, |ui| {
+        if ui.button("Pick a different board face").clicked() {
+            sess.data.annotation_sess = None;
+            return;
+        }
+        ui.label(&ann.key.prefix);
+    });
 
     Ok(())
 }
