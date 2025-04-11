@@ -1,5 +1,20 @@
-use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
+use bincode::error::DecodeError;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{io::Write, path::PathBuf};
+
+pub fn serialize<T: Serialize, W: Write>(
+    mut writer: W,
+    val: &T,
+) -> Result<(), bincode::error::EncodeError> {
+    bincode::serde::encode_into_std_write(val, &mut writer, bincode::config::standard())?;
+    Ok(())
+}
+
+pub fn deserialize<'r, D: DeserializeOwned, R: std::io::Read>(
+    src: &'r mut R,
+) -> Result<D, DecodeError> {
+    bincode::serde::decode_from_std_read(src, bincode::config::standard())
+}
 
 /// An RGB image sent over the wire
 #[derive(Deserialize, Serialize)]
