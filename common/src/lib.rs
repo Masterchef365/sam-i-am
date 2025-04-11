@@ -53,8 +53,8 @@ pub struct FaceKey {
 /// Protocol messages sent from client to server
 #[derive(Deserialize, Serialize)]
 pub enum ClientToServer {
-    /// Set the folder for the current session. Induces
-    LoadFolder(PathBuf),
+    /// Set the folder for the current session.
+    LoadFolder(String),
     /// Loads the file with the given prefix, and the given face
     LoadPath(FaceKey),
     /// Annotation events

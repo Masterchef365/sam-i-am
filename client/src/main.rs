@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Result};
 use common::{AnnotationData, ClientToServer, FaceKey, ImageData, ServerToClient};
-use egui::{ahash::HashMap, CentralPanel, Color32, Context, RichText, TextureId, TextureOptions};
+use egui::{
+    ahash::HashMap, CentralPanel, Color32, Context, DragValue, RichText, TextureId, TextureOptions,
+};
 use ewebsock::{WsEvent, WsMessage, WsReceiver, WsSender};
 
 // When compiling natively:
@@ -86,6 +88,7 @@ pub struct ClientSession {
     /// If the user has chosen a folder, lists the prefixes of the files in that folder
     folder_contents: Option<Vec<FaceKey>>,
     annotation_sess: Option<AnnotationSession>,
+    folder_path: String,
 }
 
 pub struct AnnotationSession {
@@ -144,7 +147,9 @@ impl eframe::App for TemplateApp {
             return;
         }
 
-        session_gui(ctx, session);
+        if let Err(e) = session_gui(ctx, session) {
+            self.session = Err(e);
+        }
     }
 }
 
@@ -231,8 +236,22 @@ impl ClientSession {
     }
 }
 
-fn session_gui(ctx: &Context, sess: &mut SocketSession) {
-    CentralPanel::default().show(ctx, |ui| {
-        ui.label("Connected!");
-    });
+fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
+    if sess.data.folder_contents.is_none() {
+        return CentralPanel::default().show(ctx, |ui| {
+            ui.label("Enter a folder path below:");
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(&mut sess.data.folder_path);
+                if ui.button("Load").clicked() {
+                    sess.send_ws_message(ClientToServer::LoadFolder(
+                        sess.data.folder_path.clone(),
+                    ))?;
+                }
+                Ok(())
+            })
+            .inner
+        }).inner;
+    }
+
+    Ok(())
 }
