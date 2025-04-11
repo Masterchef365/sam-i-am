@@ -277,13 +277,18 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
         }).inner;
     };
 
+    let mut do_reset = false;
     CentralPanel::default().show(ctx, |ui| {
         if ui.button("Pick a different board face").clicked() {
-            sess.data.annotation_sess = None;
+            do_reset = true;
             return;
         }
         ui.label(&ann.key.prefix);
     });
+
+    if do_reset {
+        sess.data.annotation_sess = None;
+    }
 
     Ok(())
 }

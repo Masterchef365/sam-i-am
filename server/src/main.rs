@@ -53,6 +53,6 @@ impl ClientSession {
     }
 
     pub fn handle_response(&mut self, msg: ClientToServer) -> Option<ServerToClient> {
-        todo!()
+        None
     }
 }
