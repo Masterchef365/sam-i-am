@@ -1,6 +1,7 @@
 use anyhow::{anyhow, ensure, Context, Result};
 use common::{deserialize, serialize, ClientToServer, FaceKey, ImageData, ServerToClient};
 use log::{error, info};
+use usls::{Options, SAM};
 use std::{
     fmt::Display,
     fs::File,
@@ -34,7 +35,7 @@ fn main() {
 
 fn client_handler(stream: TcpStream) -> Result<()> {
     let mut websocket = accept(stream)?;
-    let mut session = ClientSession::new();
+    let mut session = ClientSession::new("cpu:0".into())?;
     loop {
         let msg = websocket.read()?;
         let Message::Binary(msg) = msg else {
@@ -54,13 +55,27 @@ fn client_handler(stream: TcpStream) -> Result<()> {
 
 struct ClientSession {
     selected_folder: Option<PathBuf>,
+    model: SAM,
 }
 
 impl ClientSession {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(device: String) -> Result<Self> {
+        let mut options_encoder = Options::sam2_base_plus_encoder();
+        let mut options_decoder = Options::sam2_base_plus_decoder();
+        options_decoder.model_num_dry_run = 0;
+        options_encoder.model_num_dry_run = 0;
+
+        let options_encoder = options_encoder
+            .with_model_device(device.as_str().try_into()?)
+            .commit()?;
+        let options_decoder = options_decoder.commit()?;
+
+        let model = SAM::new(options_encoder, options_decoder)?;
+
+        Ok(Self {
             selected_folder: None,
-        }
+            model,
+        })
     }
 
     pub fn handle_response(&mut self, msg: ClientToServer) -> Option<ServerToClient> {
