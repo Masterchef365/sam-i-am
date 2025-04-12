@@ -36,7 +36,7 @@ pub struct Defect {
     pub class: String,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct AnnotationData {
     pub polygons: Vec<Defect>,
 }

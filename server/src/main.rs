@@ -1,7 +1,10 @@
 use anyhow::{anyhow, ensure, Context, Result};
-use common::{deserialize, serialize, ClientToServer, FaceKey, ImageData, ServerToClient};
+use common::{
+    deserialize, serialize, AnnotationData, AnnotationEvent, ClientToServer, Defect, FaceKey,
+    ImageData, SamEvent, ServerToClient,
+};
+use image::{DynamicImage, ImageBuffer, Pixel, Rgb, RgbImage};
 use log::{error, info};
-use usls::{Options, SAM};
 use std::{
     fmt::Display,
     fs::File,
@@ -10,6 +13,7 @@ use std::{
 };
 use tiff::{decoder::DecodingResult, ColorType};
 use tungstenite::{accept, Message};
+use usls::{Options, SamPrompt, Xs, Ys, SAM};
 
 /// A WebSocket echo server
 fn main() {
@@ -56,6 +60,12 @@ fn client_handler(stream: TcpStream) -> Result<()> {
 struct ClientSession {
     selected_folder: Option<PathBuf>,
     model: SAM,
+    board_face: Option<BoardFaceSession>,
+}
+
+struct BoardFaceSession {
+    xs: Xs,
+    ann: AnnotationData,
 }
 
 impl ClientSession {
@@ -75,6 +85,7 @@ impl ClientSession {
         Ok(Self {
             selected_folder: None,
             model,
+            board_face: None,
         })
     }
 
@@ -100,10 +111,31 @@ impl ClientSession {
             }
             ClientToServer::LoadKey(key) => self.selected_folder.as_ref().and_then(|folder| {
                 let file_path = folder.join(format!("{}.tiff", key.prefix));
-                ok_or_log_error(load_image(&file_path)).map(|image_data| {
-                    ServerToClient::InitialLoad(key, image_data, Default::default())
-                })
+                let image_data = ok_or_log_error(load_image(&file_path))?;
+
+                let mut ann = AnnotationData::default();
+
+                self.board_face =
+                    ok_or_log_error(BoardFaceSession::new(ann, &mut self.model, &image_data));
+
+                Some(ServerToClient::InitialLoad(
+                    key,
+                    image_data,
+                    Default::default(),
+                ))
             }),
+            ClientToServer::Annotate(AnnotationEvent::Sam(SamEvent::Click(pos, is_positive))) => {
+                if let Some(face) = &mut self.board_face {
+                    let prompts = vec![SamPrompt::default().with_postive_point(pos.x, pos.y)];
+
+                    let ys = ok_or_log_error(self.model.decode(&face.xs, &prompts))?;
+                    face.ann.polygons.push(ys_to_defect(&ys));
+
+                    Some(ServerToClient::ServerUpdated(face.ann.clone()))
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
@@ -122,4 +154,26 @@ fn load_image(path: &PathBuf) -> Result<ImageData> {
     };
 
     Ok(ImageData { width, height, rgb })
+}
+
+impl BoardFaceSession {
+    pub fn new(ann: AnnotationData, sam: &mut SAM, image: &ImageData) -> Result<Self> {
+        let xs = sam.encode(&[image_data_to_dyn_image(image)])?;
+        Ok(Self { xs, ann })
+    }
+}
+
+fn image_data_to_dyn_image(image: &ImageData) -> DynamicImage {
+    DynamicImage::ImageRgb8(
+        RgbImage::from_raw(image.width, image.height, image.rgb.clone()).unwrap(),
+    )
+}
+
+fn ys_to_defect(ys: &Ys) -> Defect {
+    let polygon = &ys[0].polygons().unwrap()[0];
+    let polygon = polygon.polygon(); // POLYGON POLYGON POLYGON POLYGON
+    let points = polygon.exterior().points();
+    let polygon = points.map(|point| common::Point { x: point.x() as f32, y: point.y() as f32 }).collect();
+
+    Defect { polygon, class: "some class idk".to_string() }
 }

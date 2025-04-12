@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use common::{AnnotationData, ClientToServer, FaceKey, ImageData, ServerToClient};
+use common::{AnnotationData, AnnotationEvent, ClientToServer, FaceKey, ImageData, SamEvent, ServerToClient};
 use egui::{
     ahash::HashMap, load::SizedTexture, CentralPanel, Color32, Context, DragValue, Rect, RichText,
     Scene, TextureId, TextureOptions, Vec2,
@@ -285,6 +285,8 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
     };
 
     let mut do_reset = false;
+    let mut do_click = None;
+
     CentralPanel::default().show(ctx, |ui| {
         if ui.button("Pick a different board face").clicked() {
             do_reset = true;
@@ -293,12 +295,22 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
         ui.label(&ann.key.prefix);
         Scene::new().show(ui, &mut ann.view_rect, |ui| {
             let [w, h] = ui.ctx().tex_manager().read().meta(ann.image).unwrap().size;
-            ui.image(SizedTexture::new(ann.image, Vec2::new(w as f32, h as f32)))
+            let resp = ui.image(SizedTexture::new(ann.image, Vec2::new(w as f32, h as f32)));
+            if let Some(pos) = resp.interact_pointer_pos() {
+                if resp.clicked() {
+                    do_click = Some(pos);
+                }
+            }
         });
     });
 
     if do_reset {
         sess.data.annotation_sess = None;
+    }
+
+    if let Some(pos) = do_click {
+        let pos = common::Point { x: pos.x, y: pos.y };
+        sess.send_ws_message(ClientToServer::Annotate(AnnotationEvent::Sam(SamEvent::Click(pos, true))))?;
     }
 
     Ok(())
