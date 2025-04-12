@@ -112,7 +112,7 @@ impl TemplateApp {
         }
         */
 
-        let session = SocketSession::new();
+        let session = SocketSession::new(cc.egui_ctx.clone());
 
         Self { session }
     }
@@ -124,7 +124,6 @@ impl eframe::App for TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint();
 
         let session = match &mut self.session {
             Ok(s) => s,
@@ -133,7 +132,7 @@ impl eframe::App for TemplateApp {
                 CentralPanel::default().show(ctx, |ui| {
                     ui.label(error);
                     if ui.button("Reconnect").clicked() {
-                        self.session = SocketSession::new();
+                        self.session = SocketSession::new(ctx.clone());
                     }
                 });
                 return;
@@ -159,10 +158,16 @@ impl eframe::App for TemplateApp {
 }
 
 impl SocketSession {
-    pub fn new() -> Result<Self> {
+    pub fn new(ctx: Context) -> Result<Self> {
         let options = ewebsock::Options::default();
+
+        let wakeup = move || {
+            // Repaint when a socket msg is received
+            ctx.request_repaint();
+        };
+
         let (sender, receiver) =
-            ewebsock::connect("ws://127.0.0.1:9001", options).map_err(|e| anyhow!("{e}"))?;
+            ewebsock::connect_with_wakeup("ws://127.0.0.1:9001", options, wakeup).map_err(|e| anyhow!("{e}"))?;
         Ok(Self {
             sender,
             receiver,
