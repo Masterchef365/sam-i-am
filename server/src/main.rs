@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use common::{ClientToServer, ServerToClient, deserialize, serialize};
+use common::{deserialize, serialize, ClientToServer, FaceKey, ServerToClient};
 use log::{error, info};
 use std::net::{TcpListener, TcpStream};
-use tungstenite::{Message, accept};
+use tungstenite::{accept, Message};
 
 /// A WebSocket echo server
 fn main() {
@@ -41,6 +41,7 @@ fn client_handler(stream: TcpStream) -> Result<()> {
             let mut buf = vec![];
             serialize(&mut buf, &resp)?;
             websocket.write(Message::Binary(buf.into()))?;
+            websocket.flush()?;
         }
     }
 }
@@ -53,6 +54,23 @@ impl ClientSession {
     }
 
     pub fn handle_response(&mut self, msg: ClientToServer) -> Option<ServerToClient> {
-        None
+        match msg {
+            ClientToServer::LoadFolder(path) => {
+                std::fs::read_dir(path).ok().map(|files| {
+                    ServerToClient::FolderContents(
+                        files
+                            .filter_map(|f| f.ok())
+                            .filter_map(|f| f.file_name().into_string().ok())
+                            .filter(|f| f.ends_with(".png"))
+                            .map(|f| FaceKey {
+                                prefix: f,
+                                is_narrow: false,
+                            })
+                            .collect(),
+                    )
+                })
+            }
+            _ => None,
+        }
     }
 }

@@ -24,25 +24,25 @@ pub struct ImageData {
     pub rgb: Vec<u8>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Point {
     pub x: f32,
     pub y: f32,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Defect {
     pub polygon: Vec<Point>,
     pub class: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct AnnotationData {
     pub polygons: Vec<Defect>,
 }
 
 /// Refers to a specific face of a board
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct FaceKey {
     /// Prefix to the file name, e.g. 20250306_054339_38x184_793738TR
     pub prefix: String,
@@ -51,7 +51,7 @@ pub struct FaceKey {
 }
 
 /// Protocol messages sent from client to server
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub enum ClientToServer {
     /// Set the folder for the current session.
     LoadFolder(String),
@@ -61,7 +61,7 @@ pub enum ClientToServer {
     Annotate(AnnotationEvent),
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub enum AnnotationEvent {
     Sam(SamEvent),
     NewDefect(Defect),
@@ -69,7 +69,7 @@ pub enum AnnotationEvent {
     EditDefect(usize, Defect),
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub enum SamEvent {
     /// True if positive click, false if negative click
     Click(Point, bool),
@@ -78,7 +78,7 @@ pub enum SamEvent {
 }
 
 /// Protocol messages sent from server to client
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub enum ServerToClient {
     /// Returned contents of a folder
     FolderContents(Vec<FaceKey>),
@@ -86,4 +86,10 @@ pub enum ServerToClient {
     InitialLoad(FaceKey, ImageData, AnnotationData),
     /// An annotation event was fired
     ServerUpdated(AnnotationData),
+}
+
+impl std::fmt::Debug for ImageData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RGB Image {}x{}", self.width, self.height)
+    }
 }

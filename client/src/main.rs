@@ -168,7 +168,7 @@ impl SocketSession {
 
     pub fn receive(&mut self, ctx: &Context) -> Result<()> {
         if let Some(msg) = self.receiver.try_recv() {
-            match msg {
+            match dbg!(msg) {
                 WsEvent::Closed => return Err(anyhow!("Remote session was closed!")),
                 WsEvent::Opened => self.is_open = true,
                 WsEvent::Error(e) => return Err(anyhow!("{e}")),
@@ -216,7 +216,7 @@ impl ClientSession {
         let mut responses = vec![];
 
         match msg {
-            ServerToClient::FolderContents(keys) => self.folder_contents = Some(keys),
+            ServerToClient::FolderContents(keys) => self.folder_contents = Some(dbg!(keys)),
             ServerToClient::InitialLoad(key, image, annotations) => {
                 let image = upload_image(ctx, image);
                 self.annotation_sess = Some(AnnotationSession {
@@ -241,7 +241,7 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
         return CentralPanel::default()
             .show(ctx, |ui| {
                 ui.label("Enter a folder path below:");
-                ui.horizontal(|ui| {
+                ui.horizontal(|ui| -> Result<()> {
                     ui.text_edit_singleline(&mut sess.data.folder_path);
                     if ui.button("Load").clicked() {
                         sess.send_ws_message(ClientToServer::LoadFolder(
@@ -250,7 +250,9 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
                     }
                     Ok(())
                 })
-                .inner
+                .inner?;
+                ui.label("Note: folder must be on a file share!");
+                Ok(())
             })
             .inner;
     }
