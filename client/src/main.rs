@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Result};
 use common::{AnnotationData, ClientToServer, FaceKey, ImageData, ServerToClient};
 use egui::{
-    ahash::HashMap, CentralPanel, Color32, Context, DragValue, RichText, TextureId, TextureOptions,
+    ahash::HashMap, load::SizedTexture, CentralPanel, Color32, Context, DragValue, Rect, RichText,
+    Scene, TextureId, TextureOptions, Vec2,
 };
 use ewebsock::{WsEvent, WsMessage, WsReceiver, WsSender};
 
@@ -95,6 +96,7 @@ pub struct AnnotationSession {
     key: FaceKey,
     annotations: AnnotationData,
     image: TextureId,
+    view_rect: Rect,
 }
 
 pub struct TemplateApp {
@@ -223,6 +225,7 @@ impl ClientSession {
                     key,
                     annotations,
                     image,
+                    view_rect: Rect::ZERO,
                 });
             }
             ServerToClient::ServerUpdated(ann) => {
@@ -258,25 +261,27 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
     }
 
     let Some(ann) = &mut sess.data.annotation_sess else {
-        return CentralPanel::default().show(ctx, |ui| {
-            if ui.button("Pick a different folder").clicked() {
-                sess.data.folder_contents = None;
-                sess.data.annotation_sess = None;
-            }
+        return CentralPanel::default()
+            .show(ctx, |ui| {
+                if ui.button("Pick a different folder").clicked() {
+                    sess.data.folder_contents = None;
+                    sess.data.annotation_sess = None;
+                }
 
-            if let Some(folder) = &sess.data.folder_contents {
-                for key in folder {
-                    if ui
-                        .button(format!("{} {}", key.prefix, key.is_narrow))
-                        .clicked()
-                    {
-                        return sess.send_ws_message(ClientToServer::LoadKey(key.clone()));
+                if let Some(folder) = &sess.data.folder_contents {
+                    for key in folder {
+                        if ui
+                            .button(format!("{} {}", key.prefix, key.is_narrow))
+                            .clicked()
+                        {
+                            return sess.send_ws_message(ClientToServer::LoadKey(key.clone()));
+                        }
                     }
                 }
-            }
 
-            Ok(())
-        }).inner;
+                Ok(())
+            })
+            .inner;
     };
 
     let mut do_reset = false;
@@ -286,6 +291,10 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
             return;
         }
         ui.label(&ann.key.prefix);
+        Scene::new().show(ui, &mut ann.view_rect, |ui| {
+            let [w, h] = ui.ctx().tex_manager().read().meta(ann.image).unwrap().size;
+            ui.image(SizedTexture::new(ann.image, Vec2::new(w as f32, h as f32)))
+        });
     });
 
     if do_reset {
