@@ -125,11 +125,15 @@ impl ClientSession {
                 ))
             }),
             ClientToServer::Annotate(AnnotationEvent::Sam(SamEvent::Click(pos, is_positive))) => {
+                dbg!(pos);
                 if let Some(face) = &mut self.board_face {
                     let prompts = vec![SamPrompt::default().with_postive_point(pos.x, pos.y)];
 
                     let ys = ok_or_log_error(self.model.decode(&face.xs, &prompts))?;
-                    face.ann.polygons.push(ys_to_defect(&ys));
+                    dbg!(&ys);
+                    if let Some(defect) = ys_to_defect(&ys) {
+                        face.ann.polygons.push(defect);
+                    }
 
                     Some(ServerToClient::ServerUpdated(face.ann.clone()))
                 } else {
@@ -169,11 +173,11 @@ fn image_data_to_dyn_image(image: &ImageData) -> DynamicImage {
     )
 }
 
-fn ys_to_defect(ys: &Ys) -> Defect {
-    let polygon = &ys[0].polygons().unwrap()[0];
-    let polygon = polygon.polygon(); // POLYGON POLYGON POLYGON POLYGON
+fn ys_to_defect(ys: &Ys) -> Option<Defect> {
+    let polygons = ys[0].polygons()?;
+    let polygon = polygons[0].polygon(); // POLYGON POLYGON POLYGON POLYGON
     let points = polygon.exterior().points();
     let polygon = points.map(|point| common::Point { x: point.x() as f32, y: point.y() as f32 }).collect();
 
-    Defect { polygon, class: "some class idk".to_string() }
+    Some(Defect { polygon, class: "some class idk".to_string() })
 }

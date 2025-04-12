@@ -3,8 +3,7 @@ use common::{
     AnnotationData, AnnotationEvent, ClientToServer, FaceKey, ImageData, SamEvent, ServerToClient,
 };
 use egui::{
-    ahash::HashMap, load::SizedTexture, CentralPanel, Color32, Context, DragValue, Rect, RichText,
-    Scene, Stroke, TextureId, TextureOptions, Vec2,
+    ahash::HashMap, load::SizedTexture, CentralPanel, Color32, Context, DragValue, Image, Rect, RichText, Scene, Sense, Stroke, TextureId, TextureOptions, Vec2
 };
 use ewebsock::{WsEvent, WsMessage, WsReceiver, WsSender};
 
@@ -297,7 +296,8 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
         ui.label(&ann.key.prefix);
         Scene::new().show(ui, &mut ann.view_rect, |ui| {
             let [w, h] = ui.ctx().tex_manager().read().meta(ann.image).unwrap().size;
-            let resp = ui.image(SizedTexture::new(ann.image, Vec2::new(w as f32, h as f32)));
+            let texture = SizedTexture::new(ann.image, Vec2::new(w as f32, h as f32));
+            let resp = ui.add(Image::new(texture).sense(Sense::click_and_drag()));
             if let Some(pos) = resp.interact_pointer_pos() {
                 if resp.clicked() {
                     do_click = Some(pos);
