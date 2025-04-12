@@ -124,6 +124,8 @@ impl eframe::App for TemplateApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.request_repaint();
+
         let session = match &mut self.session {
             Ok(s) => s,
             Err(e) => {
