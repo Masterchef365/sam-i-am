@@ -168,7 +168,7 @@ impl SocketSession {
 
     pub fn receive(&mut self, ctx: &Context) -> Result<()> {
         if let Some(msg) = self.receiver.try_recv() {
-            match dbg!(msg) {
+            match msg {
                 WsEvent::Closed => return Err(anyhow!("Remote session was closed!")),
                 WsEvent::Opened => self.is_open = true,
                 WsEvent::Error(e) => return Err(anyhow!("{e}")),
@@ -270,7 +270,7 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
                         .button(format!("{} {}", key.prefix, key.is_narrow))
                         .clicked()
                     {
-                        return sess.send_ws_message(ClientToServer::LoadPath(key.clone()));
+                        return sess.send_ws_message(ClientToServer::LoadKey(key.clone()));
                     }
                 }
             }

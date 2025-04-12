@@ -2807,6 +2807,7 @@ dependencies = [
  "common",
  "env_logger",
  "log",
+ "tiff",
  "tungstenite 0.26.2",
 ]
 

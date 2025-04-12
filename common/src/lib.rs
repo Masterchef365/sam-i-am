@@ -36,7 +36,7 @@ pub struct Defect {
     pub class: String,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 pub struct AnnotationData {
     pub polygons: Vec<Defect>,
 }
@@ -56,7 +56,7 @@ pub enum ClientToServer {
     /// Set the folder for the current session.
     LoadFolder(String),
     /// Loads the file with the given prefix, and the given face
-    LoadPath(FaceKey),
+    LoadKey(FaceKey),
     /// Annotation events
     Annotate(AnnotationEvent),
 }
