@@ -24,13 +24,13 @@ pub struct ImageData {
     pub rgb: Vec<u8>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 pub struct Point {
     pub x: f32,
     pub y: f32,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Defect {
     pub polygon: Vec<Point>,
     pub class: String,

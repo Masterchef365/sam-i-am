@@ -1,8 +1,10 @@
 use anyhow::{anyhow, Result};
-use common::{AnnotationData, AnnotationEvent, ClientToServer, FaceKey, ImageData, SamEvent, ServerToClient};
+use common::{
+    AnnotationData, AnnotationEvent, ClientToServer, FaceKey, ImageData, SamEvent, ServerToClient,
+};
 use egui::{
     ahash::HashMap, load::SizedTexture, CentralPanel, Color32, Context, DragValue, Rect, RichText,
-    Scene, TextureId, TextureOptions, Vec2,
+    Scene, Stroke, TextureId, TextureOptions, Vec2,
 };
 use ewebsock::{WsEvent, WsMessage, WsReceiver, WsSender};
 
@@ -301,6 +303,19 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
                     do_click = Some(pos);
                 }
             }
+
+            let tl = resp.rect.min;
+
+            for polygon in &ann.annotations.polygons {
+                ui.painter().line(
+                    polygon
+                        .polygon
+                        .iter()
+                        .map(|pt| tl + Vec2::new(pt.x, pt.y))
+                        .collect(),
+                    Stroke::new(1., Color32::ORANGE),
+                );
+            }
         });
     });
 
@@ -310,7 +325,9 @@ fn session_gui(ctx: &Context, sess: &mut SocketSession) -> Result<()> {
 
     if let Some(pos) = do_click {
         let pos = common::Point { x: pos.x, y: pos.y };
-        sess.send_ws_message(ClientToServer::Annotate(AnnotationEvent::Sam(SamEvent::Click(pos, true))))?;
+        sess.send_ws_message(ClientToServer::Annotate(AnnotationEvent::Sam(
+            SamEvent::Click(pos, true),
+        )))?;
     }
 
     Ok(())
